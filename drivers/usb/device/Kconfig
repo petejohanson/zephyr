@@ -31,6 +31,13 @@ config USB_DW_USB_2_0
 	help
 	  Indicates whether or not USB specification version 2.0 is supported
 
+config USB_DC_RPI_PICO
+	bool "USB device controller driver for Raspberry Pi Pico devices"
+	default y
+	depends on SOC_SERIES_RP2XXX
+	help
+	  Enable USB support on the RP2 family of processors.
+
 config USB_DC_STM32
 	bool "USB device controller driver for STM32 devices"
 	depends on SOC_FAMILY_STM32
