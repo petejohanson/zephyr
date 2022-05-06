@@ -85,4 +85,6 @@
 	pinctrl-names = "default";
 };
 
-zephyr_udc0: &usbd { };
+zephyr_udc0: &usbd {
+	status = "okay";
+};

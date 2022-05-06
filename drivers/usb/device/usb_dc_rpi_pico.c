@@ -6,13 +6,13 @@
 
 #include <soc.h>
 #include <string.h>
-#include <usb/usb_device.h>
-#include <sys/util.h>
+#include <zephyr/usb/usb_device.h>
+#include <zephyr/sys/util.h>
 #include <hardware/regs/usb.h>
 #include <hardware/structs/usb.h>
 #include <hardware/resets.h>
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(udc_rpi, CONFIG_USB_DRIVER_LOG_LEVEL);
 
@@ -249,8 +249,10 @@ static void udc_rpi_isr(const void *arg)
 	}
 }
 
-void udc_rpi_init_endpoint(uint8_t i)
+static void udc_rpi_init_endpoint(const uint8_t i)
 {
+	uint8_t *buf_ptr = &usb_dpram->epx_data[((i - 1) * 2) * DATA_BUFFER_SIZE];
+
 	state.out_ep_state[i].buf_ctl = &usb_dpram->ep_buf_ctrl[i].out;
 	state.in_ep_state[i].buf_ctl = &usb_dpram->ep_buf_ctrl[i].in;
 
@@ -258,9 +260,8 @@ void udc_rpi_init_endpoint(uint8_t i)
 		state.out_ep_state[i].ep_ctl = &usb_dpram->ep_ctrl[i - 1].out;
 		state.in_ep_state[i].ep_ctl = &usb_dpram->ep_ctrl[i - 1].in;
 
-		state.out_ep_state[i].buf =
-			&usb_dpram->epx_data[((i - 1) * 2 + 1) * DATA_BUFFER_SIZE];
-		state.in_ep_state[i].buf = &usb_dpram->epx_data[((i - 1) * 2) * DATA_BUFFER_SIZE];
+		state.out_ep_state[i].buf = buf_ptr + DATA_BUFFER_SIZE;
+		state.in_ep_state[i].buf = buf_ptr;
 	} else {
 		state.out_ep_state[i].buf = &usb_dpram->ep0_buf_a[0];
 		state.in_ep_state[i].buf = &usb_dpram->ep0_buf_a[0];
@@ -389,7 +390,8 @@ int usb_dc_ep_check_cap(const struct usb_dc_ep_cfg_data *const cfg)
 {
 	uint8_t ep_idx = USB_EP_GET_IDX(cfg->ep_addr);
 
-	LOG_DBG("ep %x, mps %d, type %d", cfg->ep_addr, cfg->ep_mps, cfg->ep_type);
+	LOG_DBG("ep 0x%02x, mps %d, type %d",
+		cfg->ep_addr, cfg->ep_mps, cfg->ep_type);
 
 	if ((cfg->ep_type == USB_DC_EP_CONTROL) && ep_idx) {
 		LOG_ERR("invalid endpoint configuration");
@@ -413,7 +415,8 @@ int usb_dc_ep_configure(const struct usb_dc_ep_cfg_data *const ep_cfg)
 		return -EINVAL;
 	}
 
-	LOG_DBG("ep 0x%02x, previous mps %u, mps %u, type %u", ep_cfg->ep_addr, ep_state->mps,
+	LOG_DBG("ep 0x%02x, previous mps %u, mps %u, type %u",
+		ep_cfg->ep_addr, ep_state->mps,
 		ep_cfg->ep_mps, ep_cfg->ep_type);
 
 	ep_state->mps = ep_cfg->ep_mps;
@@ -497,7 +500,8 @@ int usb_dc_ep_enable(const uint8_t ep)
 		return -EINVAL;
 	}
 
-	LOG_DBG("ep 0x%02x (id: %d) -> type %d", ep, USB_EP_GET_IDX(ep), ep_state->type);
+	LOG_DBG("ep 0x%02x (id: %d) -> type %d",
+		ep, USB_EP_GET_IDX(ep), ep_state->type);
 
 	/* clear buffer state (EP0 starts with PID=1 for setup phase) */
 
@@ -543,8 +547,8 @@ int usb_dc_ep_disable(const uint8_t ep)
 	return 0;
 }
 
-int usb_dc_ep_write(const uint8_t ep, const uint8_t *const data, const uint32_t data_len,
-		    uint32_t *const ret_bytes)
+int usb_dc_ep_write(const uint8_t ep, const uint8_t *const data,
+		    const uint32_t data_len, uint32_t *const ret_bytes)
 {
 	struct udc_rpi_ep_state *ep_state = udc_rpi_get_ep_state(ep);
 	uint32_t len = data_len;
@@ -598,7 +602,8 @@ uint32_t udc_rpi_get_ep_buffer_len(const uint8_t ep)
 	return buf_ctl & USB_BUF_CTRL_LEN_MASK;
 }
 
-int usb_dc_ep_read_wait(uint8_t ep, uint8_t *data, uint32_t max_data_len, uint32_t *read_bytes)
+int usb_dc_ep_read_wait(uint8_t ep, uint8_t *data,
+			uint32_t max_data_len, uint32_t *read_bytes)
 {
 	struct udc_rpi_ep_state *ep_state = udc_rpi_get_ep_state(ep);
 	uint32_t read_count;
@@ -619,8 +624,8 @@ int usb_dc_ep_read_wait(uint8_t ep, uint8_t *data, uint32_t max_data_len, uint32
 		read_count = udc_rpi_get_ep_buffer_len(ep) - ep_state->read_offset;
 	}
 
-	LOG_DBG("ep 0x%02x, %u bytes, %u+%u, %p", ep, max_data_len, ep_state->read_offset,
-		read_count, data);
+	LOG_DBG("ep 0x%02x, %u bytes, %u+%u, %p",
+		ep, max_data_len, ep_state->read_offset, read_count, data);
 
 	if (data) {
 		read_count = MIN(read_count, max_data_len);
@@ -647,17 +652,16 @@ int usb_dc_ep_read_continue(uint8_t ep)
 
 {
 	struct udc_rpi_ep_state *ep_state = udc_rpi_get_ep_state(ep);
+	size_t bytes_received;
 
 	if (!ep_state || !USB_EP_DIR_IS_OUT(ep)) {
 		LOG_ERR("Not valid endpoint: %02x", ep);
 		return -EINVAL;
 	}
 
-	size_t bytes_received =
-		(state.setup_available ?
-		 sizeof(struct usb_setup_packet) :
-		 udc_rpi_get_ep_buffer_len(ep));
-
+	bytes_received = state.setup_available ?
+			 sizeof(struct usb_setup_packet) :
+			 udc_rpi_get_ep_buffer_len(ep);
 	state.setup_available = false;
 
 	/* If no more data in the buffer, start a new read transaction. */
