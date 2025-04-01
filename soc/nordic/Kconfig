@@ -70,6 +70,17 @@ if SOC_FAMILY_NORDIC_NRF
 rsource "common/Kconfig.peripherals"
 rsource "*/Kconfig"
 
+config NRF_SOC_VALIDATE_HEADERS_DISABLED
+	bool "Disable NRF binding header validation"
+
+config NRF_SOC_VALIDATE_HEADERS
+	bool "Validate NRF dt-binding headers"
+	default y
+	depends on !NRF_SOC_VALIDATE_HEADERS_DISABLED
+	help
+	  Build an additional check to validate included dt-binding headers
+	  match the MDK.
+
 config NRF_SOC_SECURE_SUPPORTED
 	def_bool !TRUSTED_EXECUTION_NONSECURE || (BUILD_WITH_TFM && TFM_PARTITION_PLATFORM)
 	depends on !SOC_SERIES_NRF54H

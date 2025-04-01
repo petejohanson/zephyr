@@ -8,9 +8,11 @@ endif()
 
 zephyr_library_sources(
   validate_base_addresses.c
-  validate_binding_headers.c
   validate_enabled_instances.c
   )
+
+zephyr_library_sources_ifdef(CONFIG_NRF_SOC_VALIDATE_HEADERS validate_binding_headers.c)
+
 
 # Include dt-bindings headers into the build. This lets us validate all required
 # DT values against the MDK, without having to conditionally include different
