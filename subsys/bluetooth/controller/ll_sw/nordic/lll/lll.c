@@ -848,7 +848,8 @@ int lll_prepare_resolve(lll_is_abort_cb_t is_abort_cb, lll_abort_cb_t abort_cb,
 		/* If the enqueued prepare is a resume or current ready prepare is shorter, then we
 		 * should pick current ready prepare for setting up the prepare timeout.
 		 */
-		if (is_resume || ((diff & BIT(HAL_TICKER_CNTR_MSBIT)) == 0U)) {
+		if ((is_resume != 0U) ||
+		    ((diff != 0U) && ((diff & BIT(HAL_TICKER_CNTR_MSBIT)) == 0U))) {
 			ticks_at_preempt_min = ticks_at_preempt_next;
 			if (&ready->prepare_param != prepare_param) {
 				/* There is a shorter prepare in the pipeline */
